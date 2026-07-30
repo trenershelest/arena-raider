@@ -12,7 +12,6 @@
   #joyZone { left:18px; bottom:18px; width:130px; height:130px; border-radius:50%; background:rgba(255,255,255,0.08); border:2px solid rgba(255,255,255,0.25); }
   #joyThumb { position:absolute; left:35px; top:35px; width:60px; height:60px; border-radius:50%; background:rgba(255,150,0,0.55); border:2px solid rgba(255,255,255,0.6); pointer-events:none; }
   #fireBtn { right:24px; bottom:30px; width:88px; height:88px; border-radius:50%; background:rgba(255,40,40,0.35); border:3px solid rgba(255,80,80,0.8); display:flex; align-items:center; justify-content:center; font:bold 15px Arial; color:#fff; text-shadow:0 0 4px #000; }
-  #hint { position:fixed; top:6px; left:0; right:0; text-align:center; color:#888; font:11px Arial; z-index:5; pointer-events:none; }
 </style>
 <script src="https://telegram.org/js/telegram-web-app.js"></script>
 </head>
@@ -20,7 +19,6 @@
 <div id="wrap"><canvas id="gameCanvas" width="480" height="300"></canvas></div>
 <div id="joyZone"><div id="joyThumb"></div></div>
 <div id="fireBtn">FIRE</div>
-<div id="hint">WASD/стрелки — движение и поворот · пробел/клик — огонь</div>
 <script>
 (function () {
   // ---------- canvas / render config ----------
@@ -83,22 +81,35 @@
 
   // ---------- stages (10 missions, distinct biome progression) ----------
   const MISSION_DEFS = [
-    { name: 'РЖАВЫЙ СЕКТОР', hue: 265, biome: 'industrial', pano: 'girders', names: ['ползун', 'летун', 'громила'] },
-    { name: 'КИСЛОТНЫЕ ТОПИ', hue: 95, biome: 'swamp', pano: 'blobs', names: ['жалун', 'плевун', 'тварь'] },
-    { name: 'КРОВАВАЯ ПУСТОШЬ', hue: 5, biome: 'volcanic', pano: 'spikes', names: ['коготь', 'жало', 'титан'] },
-    { name: 'ЛЕДЯНОЙ УЛЕЙ', hue: 205, biome: 'ice', pano: 'icepeaks', names: ['ледоход', 'морозник', 'колосс'] },
-    { name: 'ПЕСЧАНАЯ ВЫЖИГА', hue: 38, biome: 'desert', pano: 'dunes', names: ['песчаник', 'вихрь', 'бегемот'] },
-    { name: 'ГРИБНЫЕ ПЕЩЕРЫ', hue: 285, biome: 'cave', pano: 'stalac', names: ['спорыш', 'токсик', 'грибарь'] },
-    { name: 'НЕОНОВЫЕ РУИНЫ', hue: 320, biome: 'neon', pano: 'bars', names: ['мигун', 'фантом', 'страж'] },
-    { name: 'ГЛУБОКАЯ БЕЗДНА', hue: 250, biome: 'alienhive', pano: 'hive', names: ['теневик', 'шёпот', 'поглотитель'] },
-    { name: 'КРИСТАЛЬНЫЙ ХРАМ', hue: 170, biome: 'crystal', pano: 'crystals', names: ['кристалит', 'звенящий', 'монолит'] },
-    { name: 'ЦИТАДЕЛЬ ПРИШЕЛЬЦЕВ', hue: 0, biome: 'orbital', pano: 'towers', names: ['владыка', 'жнец', 'АПЕКС'] }
+    { name: 'РЖАВЫЙ СЕКТОР', hue: 265, biome: 'industrial', pano: 'girders', names: ['ползун', 'летун', 'громила'], species: 'alien' },
+    { name: 'КИСЛОТНЫЕ ТОПИ', hue: 95, biome: 'swamp', pano: 'blobs', names: ['жалун', 'плевун', 'тварь'], species: 'predator' },
+    { name: 'КРОВАВАЯ ПУСТОШЬ', hue: 5, biome: 'volcanic', pano: 'spikes', names: ['коготь', 'жало', 'титан'], species: 'dwarf' },
+    { name: 'ЛЕДЯНОЙ УЛЕЙ', hue: 205, biome: 'ice', pano: 'icepeaks', names: ['ледоход', 'морозник', 'колосс'], species: 'ghoul' },
+    { name: 'ПЕСЧАНАЯ ВЫЖИГА', hue: 38, biome: 'desert', pano: 'dunes', names: ['песчаник', 'вихрь', 'бегемот'], species: 'frost' },
+    { name: 'ГРИБНЫЕ ПЕЩЕРЫ', hue: 285, biome: 'cave', pano: 'stalac', names: ['спорыш', 'токсик', 'грибарь'], species: 'fungoid' },
+    { name: 'НЕОНОВЫЕ РУИНЫ', hue: 320, biome: 'neon', pano: 'bars', names: ['мигун', 'фантом', 'страж'], species: 'cyborg' },
+    { name: 'ГЛУБОКАЯ БЕЗДНА', hue: 250, biome: 'alienhive', pano: 'hive', names: ['гаишник', 'инспектор', 'полковник'], species: 'cop' },
+    { name: 'КРИСТАЛЬНЫЙ ХРАМ', hue: 170, biome: 'crystal', pano: 'crystals', names: ['паяц', 'скоморох', 'арлекин'], species: 'clown' },
+    { name: 'ЦИТАДЕЛЬ ХОМЯКОВ', hue: 35, biome: 'orbital', pano: 'towers', names: ['хомяк', 'хомячище', 'ХОМЯЧИЩЕ-РЕКС'], species: 'hamster' }
   ];
+  function speciesPalette(species) {
+    switch (species) {
+      case 'predator': return { color: hslToHex(85, 35, 42), dark: hslToHex(85, 35, 20) };
+      case 'dwarf': return { color: hslToHex(30, 28, 38), dark: hslToHex(30, 28, 18) };
+      case 'ghoul': return { color: hslToHex(110, 18, 45), dark: hslToHex(110, 18, 22) };
+      case 'frost': return { color: hslToHex(195, 45, 78), dark: hslToHex(195, 45, 45) };
+      case 'cop': return { color: hslToHex(212, 22, 30), dark: hslToHex(212, 22, 14) };
+      case 'hamster': return { color: hslToHex(35, 55, 55), dark: hslToHex(35, 55, 30) };
+      default: return null;
+    }
+  }
   function mkStage(def, idx) {
     const h = def.hue;
+    const pal = speciesPalette(def.species);
     return {
       name: 'МИССИЯ ' + (idx + 1) + ': ' + def.name,
       biome: def.biome,
+      species: def.species,
       sky: [hslToHex(h, 55, 9), hslToHex(h, 50, 23)],
       floor: [hslToHex(h, 22, 13), hslToHex(h, 18, 4)],
       walls: {
@@ -109,9 +120,9 @@
       },
       panoColor: hslToHex(h, 50, 15), panoStyle: def.pano,
       enemyKinds: [
-        { name: def.names[0], color: hslToHex((h + 90) % 360, 65, 52), dark: hslToHex((h + 90) % 360, 65, 26), hp: (2 + Math.floor(idx / 3)) * 6, speed: 1.5 + idx * 0.04, radius: 0.28, dmg: 6 + idx },
-        { name: def.names[1], color: hslToHex((h + 180) % 360, 65, 55), dark: hslToHex((h + 180) % 360, 65, 28), hp: (1 + Math.floor(idx / 5)) * 6, speed: 2.6 + idx * 0.05, radius: 0.22, dmg: 4 + idx },
-        { name: def.names[2], color: hslToHex(h, 60, 48), dark: hslToHex(h, 60, 22), hp: (5 + idx) * 6, speed: 1.0 + idx * 0.03, radius: 0.38 + Math.min(0.08, idx * 0.008), dmg: 12 + idx * 2 }
+        { name: def.names[0], species: def.species, color: pal ? pal.color : hslToHex((h + 90) % 360, 65, 52), dark: pal ? pal.dark : hslToHex((h + 90) % 360, 65, 26), hp: (2 + Math.floor(idx / 3)) * 6, speed: 1.5 + idx * 0.04, radius: 0.28, dmg: 6 + idx },
+        { name: def.names[1], species: def.species, color: pal ? pal.color : hslToHex((h + 180) % 360, 65, 55), dark: pal ? pal.dark : hslToHex((h + 180) % 360, 65, 28), hp: (1 + Math.floor(idx / 5)) * 6, speed: 2.6 + idx * 0.05, radius: 0.22, dmg: 4 + idx },
+        { name: def.names[2], species: def.species, color: pal ? pal.color : hslToHex(h, 60, 48), dark: pal ? pal.dark : hslToHex(h, 60, 22), hp: (5 + idx) * 6, speed: 1.0 + idx * 0.03, radius: 0.38 + Math.min(0.08, idx * 0.008), dmg: 12 + idx * 2 }
       ]
     };
   }
@@ -124,6 +135,7 @@
     const weak = stage.enemyKinds[0], tough = stage.enemyKinds[2];
     return {
       name: 'БОСС: ' + def.names[2].toUpperCase(),
+      species: def.species,
       color: '#ff2222', dark: '#7a0000',
       hp: weak.hp * 18,
       speed: Math.max(0.5, tough.speed * 0.5),
@@ -525,47 +537,196 @@
     return '#' + (r << 16 | g << 8 | b).toString(16).padStart(6, '0');
   }
 
-  function drawHumanoidSprite(screenX, topY, size, bodyColor, headColor, walkPhase, flash, alpha, isAlien) {
+  function drawHumanoidSprite(screenX, topY, size, bodyColor, headColor, walkPhase, flash, alpha, species) {
+    // proportion/posture tweaks per species (silhouette-level differentiation)
+    let hunchX = 0, hunchY = 0, limbMul = 1, showClaws = false;
+    if (species === 'ghoul') { hunchX = size * 0.07; hunchY = size * 0.06; limbMul = 0.72; }
+    if (species === 'alien' || species === 'predator') showClaws = true;
+    const cx = screenX + hunchX, cy = topY + hunchY;
     ctx.save();
     ctx.globalAlpha = alpha;
     const legSwing = Math.sin(walkPhase) * size * 0.14;
     ctx.fillStyle = flash ? '#ffffff' : shadeHex(bodyColor, -30);
-    const legTopY = topY + size * 0.66;
-    ctx.fillRect(screenX - size * 0.15, legTopY + Math.max(0, legSwing), size * 0.11, size * 0.34 - Math.max(0, legSwing));
-    ctx.fillRect(screenX + size * 0.04, legTopY + Math.max(0, -legSwing), size * 0.11, size * 0.34 - Math.max(0, -legSwing));
+    const legTopY = cy + size * 0.66;
+    const legW = size * 0.11 * limbMul;
+    ctx.fillRect(cx - size * 0.15, legTopY + Math.max(0, legSwing), legW, size * 0.34 - Math.max(0, legSwing));
+    ctx.fillRect(cx + size * 0.04, legTopY + Math.max(0, -legSwing), legW, size * 0.34 - Math.max(0, -legSwing));
     const armSwing = Math.sin(walkPhase + Math.PI) * size * 0.1;
     ctx.fillStyle = flash ? '#ffffff' : shadeHex(bodyColor, -15);
-    ctx.fillRect(screenX - size * 0.27, topY + size * 0.34 + armSwing, size * 0.08, size * 0.3);
-    ctx.fillRect(screenX + size * 0.19, topY + size * 0.34 - armSwing, size * 0.08, size * 0.3);
-    if (isAlien) {
-      // claws
+    const armW = size * 0.08 * limbMul;
+    ctx.fillRect(cx - size * 0.27, cy + size * 0.34 + armSwing, armW, size * 0.3);
+    ctx.fillRect(cx + size * 0.19, cy + size * 0.34 - armSwing, armW, size * 0.3);
+    if (showClaws) {
       ctx.fillStyle = flash ? '#ffffff' : shadeHex(bodyColor, -40);
-      const clawY1 = topY + size * 0.34 + armSwing + size * 0.3, clawY2 = topY + size * 0.34 - armSwing + size * 0.3;
-      ctx.beginPath(); ctx.moveTo(screenX - size * 0.27, clawY1); ctx.lineTo(screenX - size * 0.31, clawY1 + size * 0.08); ctx.lineTo(screenX - size * 0.23, clawY1 + size * 0.04); ctx.fill();
-      ctx.beginPath(); ctx.moveTo(screenX + size * 0.27, clawY2); ctx.lineTo(screenX + size * 0.31, clawY2 + size * 0.08); ctx.lineTo(screenX + size * 0.23, clawY2 + size * 0.04); ctx.fill();
+      const clawY1 = cy + size * 0.34 + armSwing + size * 0.3, clawY2 = cy + size * 0.34 - armSwing + size * 0.3;
+      ctx.beginPath(); ctx.moveTo(cx - size * 0.27, clawY1); ctx.lineTo(cx - size * 0.31, clawY1 + size * 0.08); ctx.lineTo(cx - size * 0.23, clawY1 + size * 0.04); ctx.fill();
+      ctx.beginPath(); ctx.moveTo(cx + size * 0.27, clawY2); ctx.lineTo(cx + size * 0.31, clawY2 + size * 0.08); ctx.lineTo(cx + size * 0.23, clawY2 + size * 0.04); ctx.fill();
     }
     ctx.fillStyle = flash ? '#ffffff' : bodyColor;
-    roundRect(screenX - size * 0.19, topY + size * 0.3, size * 0.38, size * 0.4, size * 0.07); ctx.fill();
-    if (isAlien) {
+    roundRect(cx - size * 0.19, cy + size * 0.3, size * 0.38, size * 0.4, size * 0.07); ctx.fill();
+    if (species === 'ghoul') {
+      // tattered notches along torso edge
+      ctx.fillStyle = flash ? '#ffffff' : shadeHex(bodyColor, -35);
+      for (let i = 0; i < 3; i++) {
+        const ny = cy + size * 0.42 + i * size * 0.09;
+        ctx.beginPath(); ctx.moveTo(cx - size * 0.19, ny); ctx.lineTo(cx - size * 0.24, ny + size * 0.04); ctx.lineTo(cx - size * 0.19, ny + size * 0.06); ctx.fill();
+        ctx.beginPath(); ctx.moveTo(cx + size * 0.19, ny); ctx.lineTo(cx + size * 0.24, ny + size * 0.04); ctx.lineTo(cx + size * 0.19, ny + size * 0.06); ctx.fill();
+      }
+    }
+    if (species === 'cop') {
+      // white sash across torso + baton
+      ctx.fillStyle = flash ? '#ffffff' : '#eeeeee';
+      ctx.fillRect(cx - size * 0.19, cy + size * 0.46, size * 0.38, size * 0.05);
+      ctx.fillStyle = flash ? '#ffffff' : '#dddddd';
+      ctx.fillRect(cx + size * 0.29, cy + size * 0.5, size * 0.05, size * 0.22);
+    }
+    if (species === 'alien') {
       // elongated alien head with antennae + single glowing eye + mandibles
       ctx.lineWidth = Math.max(1, size * 0.02); ctx.strokeStyle = flash ? '#ffffff' : shadeHex(bodyColor, -20);
-      ctx.beginPath(); ctx.moveTo(screenX - size * 0.05, topY + size * 0.08); ctx.quadraticCurveTo(screenX - size * 0.22, topY - size * 0.08, screenX - size * 0.18, topY - size * 0.24); ctx.stroke();
-      ctx.beginPath(); ctx.moveTo(screenX + size * 0.05, topY + size * 0.08); ctx.quadraticCurveTo(screenX + size * 0.22, topY - size * 0.08, screenX + size * 0.18, topY - size * 0.24); ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(cx - size * 0.05, cy + size * 0.08); ctx.quadraticCurveTo(cx - size * 0.22, cy - size * 0.08, cx - size * 0.18, cy - size * 0.24); ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(cx + size * 0.05, cy + size * 0.08); ctx.quadraticCurveTo(cx + size * 0.22, cy - size * 0.08, cx + size * 0.18, cy - size * 0.24); ctx.stroke();
       ctx.fillStyle = flash ? '#ffffff' : headColor;
-      ctx.save(); ctx.translate(screenX, topY + size * 0.16); ctx.scale(0.82, 1.15);
+      ctx.save(); ctx.translate(cx, cy + size * 0.16); ctx.scale(0.82, 1.15);
       ctx.beginPath(); ctx.arc(0, 0, size * 0.165, 0, Math.PI * 2); ctx.fill(); ctx.restore();
       ctx.fillStyle = flash ? '#111' : '#8fffb0';
-      ctx.save(); ctx.translate(screenX, topY + size * 0.13); ctx.scale(1.5, 0.85);
+      ctx.save(); ctx.translate(cx, cy + size * 0.13); ctx.scale(1.5, 0.85);
       ctx.beginPath(); ctx.arc(0, 0, size * 0.075, 0, Math.PI * 2); ctx.fill(); ctx.restore();
       ctx.fillStyle = flash ? '#fff' : '#0a2a12';
-      ctx.beginPath(); ctx.arc(screenX, topY + size * 0.13, size * 0.03, 0, Math.PI * 2); ctx.fill();
-    } else {
+      ctx.beginPath(); ctx.arc(cx, cy + size * 0.13, size * 0.03, 0, Math.PI * 2); ctx.fill();
+    } else if (species === 'predator') {
+      // broad masked head block + forward-jutting mandibles + dreadlocks
       ctx.fillStyle = flash ? '#ffffff' : headColor;
-      ctx.beginPath(); ctx.arc(screenX, topY + size * 0.17, size * 0.165, 0, Math.PI * 2); ctx.fill();
+      roundRect(cx - size * 0.2, cy - size * 0.01, size * 0.4, size * 0.22, size * 0.05); ctx.fill();
+      ctx.fillStyle = flash ? '#111' : shadeHex(headColor, -50);
+      ctx.beginPath(); ctx.moveTo(cx - size * 0.11, cy + size * 0.2); ctx.lineTo(cx - size * 0.15, cy + size * 0.3); ctx.lineTo(cx - size * 0.04, cy + size * 0.22); ctx.fill();
+      ctx.beginPath(); ctx.moveTo(cx + size * 0.11, cy + size * 0.2); ctx.lineTo(cx + size * 0.15, cy + size * 0.3); ctx.lineTo(cx + size * 0.04, cy + size * 0.22); ctx.fill();
+      ctx.strokeStyle = flash ? '#fff' : shadeHex(headColor, -30); ctx.lineWidth = Math.max(1, size * 0.02);
+      ctx.beginPath(); ctx.moveTo(cx - size * 0.13, cy + size * 0.18); ctx.lineTo(cx - size * 0.15, cy + size * 0.42); ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(cx - size * 0.04, cy + size * 0.2); ctx.lineTo(cx - size * 0.05, cy + size * 0.44); ctx.stroke();
+      ctx.fillStyle = '#ffcc33';
+      ctx.beginPath(); ctx.arc(cx - size * 0.06, cy + size * 0.09, size * 0.025, 0, Math.PI * 2); ctx.fill();
+      ctx.beginPath(); ctx.arc(cx + size * 0.06, cy + size * 0.09, size * 0.025, 0, Math.PI * 2); ctx.fill();
+    } else if (species === 'frost') {
+      // pale round head + ice-spike crown + pulsing glow eye
+      ctx.fillStyle = flash ? '#ffffff' : headColor;
+      ctx.beginPath(); ctx.arc(cx, cy + size * 0.17, size * 0.165, 0, Math.PI * 2); ctx.fill();
+      ctx.fillStyle = flash ? '#ffffff' : '#eafcff';
+      for (let i = -1; i <= 1; i++) {
+        ctx.beginPath(); ctx.moveTo(cx + i * size * 0.09, cy - size * 0.02); ctx.lineTo(cx + i * size * 0.09 - size * 0.03, cy + size * 0.08); ctx.lineTo(cx + i * size * 0.09 + size * 0.03, cy + size * 0.08); ctx.fill();
+      }
+      const pulse = 0.5 + 0.5 * Math.sin(performance.now() / 300);
+      ctx.fillStyle = 'rgba(150,240,255,' + (0.5 + 0.4 * pulse) + ')';
+      ctx.beginPath(); ctx.arc(cx, cy + size * 0.16, size * 0.045, 0, Math.PI * 2); ctx.fill();
+    } else if (species === 'cop') {
+      // human head + peaked cap
+      ctx.fillStyle = flash ? '#ffffff' : headColor;
+      ctx.beginPath(); ctx.arc(cx, cy + size * 0.18, size * 0.15, 0, Math.PI * 2); ctx.fill();
+      ctx.fillStyle = flash ? '#fff' : '#dddddd';
+      ctx.beginPath(); ctx.moveTo(cx - size * 0.16, cy + size * 0.04); ctx.lineTo(cx + size * 0.16, cy + size * 0.04); ctx.lineTo(cx + size * 0.09, cy - size * 0.06); ctx.lineTo(cx - size * 0.09, cy - size * 0.06); ctx.fill();
+      ctx.fillRect(cx - size * 0.19, cy + size * 0.02, size * 0.38, size * 0.03);
       ctx.fillStyle = '#ffee55';
-      ctx.beginPath(); ctx.arc(screenX - size * 0.06, topY + size * 0.15, size * 0.03, 0, Math.PI * 2); ctx.fill();
-      ctx.beginPath(); ctx.arc(screenX + size * 0.06, topY + size * 0.15, size * 0.03, 0, Math.PI * 2); ctx.fill();
+      ctx.beginPath(); ctx.arc(cx - size * 0.05, cy + size * 0.17, size * 0.025, 0, Math.PI * 2); ctx.fill();
+      ctx.beginPath(); ctx.arc(cx + size * 0.05, cy + size * 0.17, size * 0.025, 0, Math.PI * 2); ctx.fill();
+    } else if (species === 'fungoid') {
+      // mushroom-cap head with faint spore dots
+      ctx.fillStyle = flash ? '#ffffff' : headColor;
+      ctx.beginPath(); ctx.arc(cx, cy + size * 0.14, size * 0.19, Math.PI, Math.PI * 2); ctx.fill();
+      ctx.fillRect(cx - size * 0.19, cy + size * 0.14, size * 0.38, size * 0.08);
+      ctx.fillStyle = flash ? '#eee' : 'rgba(220,255,180,0.85)';
+      ctx.beginPath(); ctx.arc(cx - size * 0.08, cy + size * 0.06, size * 0.02, 0, Math.PI * 2); ctx.fill();
+      ctx.beginPath(); ctx.arc(cx + size * 0.05, cy + size * 0.03, size * 0.018, 0, Math.PI * 2); ctx.fill();
+      ctx.fillStyle = '#111';
+      ctx.beginPath(); ctx.arc(cx, cy + size * 0.2, size * 0.028, 0, Math.PI * 2); ctx.fill();
+    } else if (species === 'cyborg') {
+      // blocky robotic head + red visor strip
+      ctx.fillStyle = flash ? '#ffffff' : headColor;
+      ctx.fillRect(cx - size * 0.15, cy - size * 0.02, size * 0.3, size * 0.2);
+      ctx.fillStyle = flash ? '#fff' : '#ff3333';
+      ctx.fillRect(cx - size * 0.11, cy + size * 0.06, size * 0.22, size * 0.03);
+    } else if (species === 'clown') {
+      // round head, red nose, colorful hair tuft
+      ctx.fillStyle = flash ? '#ffffff' : headColor;
+      ctx.beginPath(); ctx.arc(cx, cy + size * 0.17, size * 0.17, 0, Math.PI * 2); ctx.fill();
+      ctx.fillStyle = flash ? '#fff' : shadeHex(headColor, 40);
+      ctx.beginPath(); ctx.moveTo(cx, cy - size * 0.12); ctx.lineTo(cx - size * 0.09, cy + size * 0.01); ctx.lineTo(cx + size * 0.09, cy + size * 0.01); ctx.fill();
+      ctx.fillStyle = '#ff3355';
+      ctx.beginPath(); ctx.arc(cx, cy + size * 0.2, size * 0.045, 0, Math.PI * 2); ctx.fill();
+      ctx.fillStyle = '#fff';
+      ctx.beginPath(); ctx.arc(cx - size * 0.06, cy + size * 0.14, size * 0.025, 0, Math.PI * 2); ctx.fill();
+      ctx.beginPath(); ctx.arc(cx + size * 0.06, cy + size * 0.14, size * 0.025, 0, Math.PI * 2); ctx.fill();
+    } else {
+      // default human head (also used for friendly NPCs)
+      ctx.fillStyle = flash ? '#ffffff' : headColor;
+      ctx.beginPath(); ctx.arc(cx, cy + size * 0.17, size * 0.165, 0, Math.PI * 2); ctx.fill();
+      ctx.fillStyle = '#ffee55';
+      ctx.beginPath(); ctx.arc(cx - size * 0.06, cy + size * 0.15, size * 0.03, 0, Math.PI * 2); ctx.fill();
+      ctx.beginPath(); ctx.arc(cx + size * 0.06, cy + size * 0.15, size * 0.03, 0, Math.PI * 2); ctx.fill();
     }
+    ctx.restore();
+  }
+
+  function drawDwarfSprite(screenX, topY, size, bodyColor, headColor, walkPhase, flash, alpha) {
+    // short and stout: compress vertical scale, widen horizontal scale
+    const SY = size * 0.72, SX = size * 1.3;
+    const baseY = topY + (size - SY); // keep feet planted at same ground line
+    ctx.save();
+    ctx.globalAlpha = alpha;
+    const legSwing = Math.sin(walkPhase) * SY * 0.14;
+    ctx.fillStyle = flash ? '#ffffff' : shadeHex(bodyColor, -30);
+    const legTopY = baseY + SY * 0.66;
+    ctx.fillRect(screenX - SX * 0.16, legTopY + Math.max(0, legSwing), SX * 0.13, SY * 0.34 - Math.max(0, legSwing));
+    ctx.fillRect(screenX + SX * 0.03, legTopY + Math.max(0, -legSwing), SX * 0.13, SY * 0.34 - Math.max(0, -legSwing));
+    const armSwing = Math.sin(walkPhase + Math.PI) * SY * 0.1;
+    ctx.fillStyle = flash ? '#ffffff' : shadeHex(bodyColor, -15);
+    ctx.fillRect(screenX - SX * 0.3, baseY + SY * 0.34 + armSwing, SX * 0.1, SY * 0.3);
+    ctx.fillRect(screenX + SX * 0.2, baseY + SY * 0.34 - armSwing, SX * 0.1, SY * 0.3);
+    ctx.fillStyle = flash ? '#ffffff' : bodyColor;
+    roundRect(screenX - SX * 0.22, baseY + SY * 0.28, SX * 0.44, SY * 0.42, SY * 0.08); ctx.fill();
+    // small helmet block
+    ctx.fillStyle = flash ? '#ffffff' : shadeHex(headColor, -10);
+    ctx.fillRect(screenX - SX * 0.15, baseY - size * 0.01, SX * 0.3, SY * 0.09);
+    // head
+    ctx.fillStyle = flash ? '#ffffff' : headColor;
+    ctx.beginPath(); ctx.arc(screenX, baseY + SY * 0.18, SY * 0.17, 0, Math.PI * 2); ctx.fill();
+    // wedge beard
+    ctx.fillStyle = flash ? '#eeeeee' : '#cfc4a8';
+    ctx.beginPath(); ctx.moveTo(screenX - SX * 0.12, baseY + SY * 0.24); ctx.lineTo(screenX + SX * 0.12, baseY + SY * 0.24); ctx.lineTo(screenX, baseY + SY * 0.46); ctx.fill();
+    ctx.fillStyle = '#ffee55';
+    ctx.beginPath(); ctx.arc(screenX - SX * 0.06, baseY + SY * 0.15, SX * 0.025, 0, Math.PI * 2); ctx.fill();
+    ctx.beginPath(); ctx.arc(screenX + SX * 0.06, baseY + SY * 0.15, SX * 0.025, 0, Math.PI * 2); ctx.fill();
+    ctx.restore();
+  }
+
+  function drawHamsterSprite(screenX, topY, size, bodyColor, headColor, walkPhase, flash, alpha) {
+    ctx.save();
+    ctx.globalAlpha = alpha;
+    const bob = Math.sin(walkPhase) * size * 0.03;
+    const cy = topY + size * 0.58 + bob;
+    // stubby limbs
+    ctx.fillStyle = flash ? '#ffffff' : shadeHex(bodyColor, -25);
+    ctx.beginPath(); ctx.ellipse(screenX - size * 0.27, cy + size * 0.26, size * 0.09, size * 0.12, 0, 0, Math.PI * 2); ctx.fill();
+    ctx.beginPath(); ctx.ellipse(screenX + size * 0.27, cy + size * 0.26, size * 0.09, size * 0.12, 0, 0, Math.PI * 2); ctx.fill();
+    // wide oval body
+    ctx.fillStyle = flash ? '#ffffff' : bodyColor;
+    ctx.beginPath(); ctx.ellipse(screenX, cy, size * 0.42, size * 0.3, 0, 0, Math.PI * 2); ctx.fill();
+    // round head
+    const headY = cy - size * 0.32;
+    ctx.beginPath(); ctx.ellipse(screenX, headY, size * 0.26, size * 0.22, 0, 0, Math.PI * 2); ctx.fill();
+    // ears
+    ctx.fillStyle = flash ? '#ffffff' : shadeHex(bodyColor, -15);
+    ctx.beginPath(); ctx.arc(screenX - size * 0.18, headY - size * 0.17, size * 0.09, 0, Math.PI * 2); ctx.fill();
+    ctx.beginPath(); ctx.arc(screenX + size * 0.18, headY - size * 0.17, size * 0.09, 0, Math.PI * 2); ctx.fill();
+    // pink cheeks
+    ctx.fillStyle = flash ? '#ffdddd' : '#ffb3c1';
+    ctx.beginPath(); ctx.arc(screenX - size * 0.16, headY + size * 0.07, size * 0.06, 0, Math.PI * 2); ctx.fill();
+    ctx.beginPath(); ctx.arc(screenX + size * 0.16, headY + size * 0.07, size * 0.06, 0, Math.PI * 2); ctx.fill();
+    // eyes
+    ctx.fillStyle = '#221100';
+    ctx.beginPath(); ctx.arc(screenX - size * 0.08, headY, size * 0.035, 0, Math.PI * 2); ctx.fill();
+    ctx.beginPath(); ctx.arc(screenX + size * 0.08, headY, size * 0.035, 0, Math.PI * 2); ctx.fill();
+    // nose
+    ctx.fillStyle = '#663322';
+    ctx.beginPath(); ctx.arc(screenX, headY + size * 0.08, size * 0.02, 0, Math.PI * 2); ctx.fill();
     ctx.restore();
   }
 
@@ -598,10 +759,10 @@
     const items = [];
     for (const e of enemies) {
       if (!e.alive) continue;
-      items.push({ x: e.x, y: e.y, body: e.kind.color, head: e.kind.dark, radius: e.kind.radius, animT: e.animT || 0, hitT: e.hitT, hp: e.hp, maxHp: e.maxHp, alien: true, type: 'humanoid' });
+      items.push({ x: e.x, y: e.y, body: e.kind.color, head: e.kind.dark, radius: e.kind.radius, animT: e.animT || 0, hitT: e.hitT, hp: e.hp, maxHp: e.maxHp, species: e.kind.species, type: 'humanoid' });
     }
     for (const n of npcs) {
-      items.push({ x: n.x, y: n.y, body: NPC_KIND.color, head: NPC_KIND.dark, radius: NPC_KIND.radius, animT: n.animT || 0, hitT: 0, hp: null, maxHp: null, alien: false, type: 'humanoid' });
+      items.push({ x: n.x, y: n.y, body: NPC_KIND.color, head: NPC_KIND.dark, radius: NPC_KIND.radius, animT: n.animT || 0, hitT: 0, hp: null, maxHp: null, species: null, type: 'humanoid' });
     }
     if (artifactCrate && !artifactCrate.opened) {
       items.push({ x: artifactCrate.x, y: artifactCrate.y, radius: 0.3, type: 'crate' });
@@ -626,7 +787,13 @@
         drawCrateSprite(screenX, topY, size, alpha);
         continue;
       }
-      drawHumanoidSprite(screenX, topY, size, s.o.body, s.o.head, s.o.animT, s.o.hitT > 0, alpha, s.o.alien);
+      if (s.o.species === 'dwarf') {
+        drawDwarfSprite(screenX, topY, size, s.o.body, s.o.head, s.o.animT, s.o.hitT > 0, alpha);
+      } else if (s.o.species === 'hamster') {
+        drawHamsterSprite(screenX, topY, size, s.o.body, s.o.head, s.o.animT, s.o.hitT > 0, alpha);
+      } else {
+        drawHumanoidSprite(screenX, topY, size, s.o.body, s.o.head, s.o.animT, s.o.hitT > 0, alpha, s.o.species);
+      }
       if (s.o.hp !== null && s.o.hp < s.o.maxHp) {
         const bw = size * 0.5;
         ctx.fillStyle = 'rgba(0,0,0,0.6)'; ctx.fillRect(screenX - bw / 2, topY - 8, bw, 4);
