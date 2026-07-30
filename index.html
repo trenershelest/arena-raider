@@ -690,14 +690,14 @@
     centeredText('ALEX SHELEST', RH * 0.1, 26, '#ff5533');
     centeredText('WARRIOR I', RH * 0.1 + 32, 34, '#ffaa22');
     ctx.restore();
-    ctx.font = '13px Arial'; ctx.fillStyle = '#ddd'; ctx.textAlign = 'center';
-    ctx.fillText('10 миссий · пришельцы · бонусная гонка на танке', RW / 2, RH * 0.1 + 66);
+    ctx.font = '10px Arial'; ctx.fillStyle = '#ddd'; ctx.textAlign = 'center';
+    ctx.fillText('10 миссий · пришельцы · бонусная гонка на танке', RW / 2, 84);
     ctx.textAlign = 'left';
 
     ctx.font = '11px Arial'; ctx.fillStyle = '#ccc'; ctx.textAlign = 'center';
-    ctx.fillText('ВЫБОР ОРУЖИЯ', RW / 2, 90);
+    ctx.fillText('ВЫБОР ОРУЖИЯ', RW / 2, 100);
     ctx.textAlign = 'left';
-    const wBtnY = 94, wBtnH = 28, wBtnW = 142, wGap = 8;
+    const wBtnY = 104, wBtnH = 24, wBtnW = 142, wGap = 8;
     const wTotalW = wBtnW * 3 + wGap * 2;
     const wStartX = (RW - wTotalW) / 2;
     for (let wi = 0; wi < WEAPON_ORDER.length; wi++) {
@@ -715,18 +715,18 @@
     }
 
     ctx.font = 'bold 12px Arial'; ctx.fillStyle = '#ffcc33'; ctx.textAlign = 'center';
-    ctx.fillText('ЛОКАЛЬНЫЙ ТОП-5', RW / 2, 140);
+    ctx.fillText('ЛОКАЛЬНЫЙ ТОП-5', RW / 2, 144);
     ctx.textAlign = 'left';
     const board = getLeaderboard();
     ctx.font = '10px Arial';
     if (board.length === 0) {
       ctx.fillStyle = '#999'; ctx.textAlign = 'center';
-      ctx.fillText('Пока нет результатов', RW / 2, 155);
+      ctx.fillText('Пока нет результатов', RW / 2, 158);
       ctx.textAlign = 'left';
     } else {
       for (let bi = 0; bi < Math.min(5, board.length); bi++) {
         const row = board[bi];
-        const ry = 154 + bi * 11;
+        const ry = 157 + bi * 10;
         ctx.fillStyle = bi === 0 ? '#ffcc33' : '#ccc';
         ctx.textAlign = 'left'; ctx.fillText((bi + 1) + '. ' + row.score + ' очк.', RW / 2 - 110, ry);
         ctx.textAlign = 'right'; ctx.fillText('миссия ' + row.stageReached + ' · ' + ((WEAPONS[row.weapon] && WEAPONS[row.weapon].name) || row.weapon), RW / 2 + 110, ry);
@@ -734,10 +734,10 @@
       }
     }
 
-    buttons.start = { x: RW / 2 - 90, y: 214, w: 180, h: 48 };
+    buttons.start = { x: RW / 2 - 90, y: 212, w: 180, h: 44 };
     ctx.fillStyle = '#ff9900'; roundRect(buttons.start.x, buttons.start.y, buttons.start.w, buttons.start.h, 12); ctx.fill();
-    centeredText('В БОЙ', buttons.start.y + 31, 20, '#1a1a1a');
-    if (highScore > 0) centeredText('Рекорд: ' + highScore, 280, 13, '#ffaa00', 'normal');
+    centeredText('В БОЙ', buttons.start.y + 29, 19, '#1a1a1a');
+    if (highScore > 0) centeredText('Рекорд: ' + highScore, 270, 13, '#ffaa00', 'normal');
   }
   function drawGameOver() {
     ctx.fillStyle = 'rgba(0,0,0,0.85)'; ctx.fillRect(0, 0, RW, RH);
