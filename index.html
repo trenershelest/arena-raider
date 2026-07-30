@@ -145,6 +145,117 @@
   // Paste an invoice link generated via your bot's Bot API createInvoiceLink (currency 'XTR', amount 1) to enable real Telegram Stars payment.
   const STAR_INVOICE_LINK = 'https://t.me/$xxgy4OdMWEuqFAAAE9p--g7fLWk';
 
+  // ---------- audio (procedural, no external files) ----------
+  let actx = null, masterGain = null, musicGain = null, sfxGain = null;
+  let audioUnlocked = false, musicTimer = null, musicNextNoteTime = 0, musicStep = 0;
+  const MUSIC_BPM = 120;
+  const MUSIC_STEP_DUR = 60 / MUSIC_BPM / 2;
+  const MUSIC_MELODY = [220, 0, 262, 220, 0, 196, 220, 0, 262, 294, 262, 220, 0, 196, 220, 0];
+  const MUSIC_BASS = [110, 0, 0, 0, 98, 0, 0, 0, 110, 0, 0, 0, 98, 0, 0, 0];
+
+  function ensureAudio() {
+    if (actx) return;
+    try {
+      const AC = window.AudioContext || window.webkitAudioContext;
+      if (!AC) return;
+      actx = new AC();
+      masterGain = actx.createGain(); masterGain.gain.value = 0.9; masterGain.connect(actx.destination);
+      musicGain = actx.createGain(); musicGain.gain.value = 0.16; musicGain.connect(masterGain);
+      sfxGain = actx.createGain(); sfxGain.gain.value = 0.55; sfxGain.connect(masterGain);
+    } catch (e) { actx = null; }
+  }
+
+  function unlockAudio() {
+    ensureAudio();
+    if (!actx) return;
+    if (actx.state === 'suspended') { try { actx.resume(); } catch (e) {} }
+    if (!audioUnlocked) { audioUnlocked = true; startMusic(); }
+  }
+
+  function beep(freq, dur, type, vol, sweepTo, out) {
+    if (!actx) return;
+    const t0 = actx.currentTime;
+    const osc = actx.createOscillator();
+    const g = actx.createGain();
+    osc.type = type || 'square';
+    osc.frequency.setValueAtTime(freq, t0);
+    if (sweepTo) osc.frequency.exponentialRampToValueAtTime(Math.max(1, sweepTo), t0 + dur);
+    g.gain.setValueAtTime(0.0001, t0);
+    g.gain.exponentialRampToValueAtTime(vol || 0.4, t0 + 0.01);
+    g.gain.exponentialRampToValueAtTime(0.0001, t0 + dur);
+    osc.connect(g); g.connect(out || sfxGain);
+    osc.start(t0); osc.stop(t0 + dur + 0.03);
+  }
+
+  function noiseBurst(dur, vol, filterFreq) {
+    if (!actx) return;
+    const t0 = actx.currentTime;
+    const bufferSize = Math.max(1, Math.floor(actx.sampleRate * dur));
+    const buffer = actx.createBuffer(1, bufferSize, actx.sampleRate);
+    const data = buffer.getChannelData(0);
+    for (let i = 0; i < bufferSize; i++) data[i] = (Math.random() * 2 - 1) * (1 - i / bufferSize);
+    const src = actx.createBufferSource();
+    src.buffer = buffer;
+    const filt = actx.createBiquadFilter();
+    filt.type = 'lowpass'; filt.frequency.value = filterFreq || 4000;
+    const g = actx.createGain();
+    g.gain.setValueAtTime(vol || 0.5, t0);
+    g.gain.exponentialRampToValueAtTime(0.0001, t0 + dur);
+    src.connect(filt); filt.connect(g); g.connect(sfxGain);
+    src.start(t0);
+  }
+
+  function sfxShoot() { beep(880, 0.07, 'sawtooth', 0.22, 240); }
+  function sfxTankShoot() { beep(220, 0.14, 'square', 0.3, 60); noiseBurst(0.08, 0.2, 3000); }
+  function sfxHit() { noiseBurst(0.1, 0.3, 2200); }
+  function sfxEnemyDeath() { beep(420, 0.22, 'square', 0.3, 50); noiseBurst(0.16, 0.28, 1400); }
+  function sfxPlayerHurt() { beep(150, 0.2, 'square', 0.35, 70); }
+  function sfxCrash() { noiseBurst(0.32, 0.5, 800); beep(120, 0.25, 'sawtooth', 0.3, 40); }
+  function sfxUiBeep() { beep(700, 0.06, 'square', 0.2); }
+  function sfxWaveClear() { [660, 880, 1100].forEach((f, i) => setTimeout(() => beep(f, 0.12, 'square', 0.25), i * 90)); }
+  function sfxStageClear() { [523, 659, 784, 1046].forEach((f, i) => setTimeout(() => beep(f, 0.15, 'square', 0.28), i * 100)); }
+  function sfxVictory() { [523, 659, 784, 1046, 1318].forEach((f, i) => setTimeout(() => beep(f, 0.2, 'triangle', 0.3), i * 130)); }
+  function sfxGameOver() { [400, 340, 260, 180].forEach((f, i) => setTimeout(() => beep(f, 0.24, 'sawtooth', 0.3), i * 140)); }
+
+  function scheduleMusicStep(time) {
+    const freq = MUSIC_MELODY[musicStep % MUSIC_MELODY.length];
+    if (freq) {
+      const osc = actx.createOscillator(), g = actx.createGain();
+      osc.type = 'square'; osc.frequency.setValueAtTime(freq, time);
+      g.gain.setValueAtTime(0.0001, time);
+      g.gain.exponentialRampToValueAtTime(0.2, time + 0.015);
+      g.gain.exponentialRampToValueAtTime(0.0001, time + MUSIC_STEP_DUR * 0.85);
+      osc.connect(g); g.connect(musicGain);
+      osc.start(time); osc.stop(time + MUSIC_STEP_DUR);
+    }
+    const bassFreq = MUSIC_BASS[musicStep % MUSIC_BASS.length];
+    if (bassFreq) {
+      const osc = actx.createOscillator(), g = actx.createGain();
+      osc.type = 'triangle'; osc.frequency.setValueAtTime(bassFreq, time);
+      g.gain.setValueAtTime(0.0001, time);
+      g.gain.exponentialRampToValueAtTime(0.28, time + 0.02);
+      g.gain.exponentialRampToValueAtTime(0.0001, time + MUSIC_STEP_DUR * 3.6);
+      osc.connect(g); g.connect(musicGain);
+      osc.start(time); osc.stop(time + MUSIC_STEP_DUR * 4);
+    }
+    musicStep++;
+  }
+
+  function musicScheduler() {
+    if (!actx) return;
+    while (musicNextNoteTime < actx.currentTime + 0.15) {
+      scheduleMusicStep(musicNextNoteTime);
+      musicNextNoteTime += MUSIC_STEP_DUR;
+    }
+  }
+
+  function startMusic() {
+    if (!actx || musicTimer) return;
+    musicStep = 0;
+    musicNextNoteTime = actx.currentTime + 0.05;
+    musicTimer = setInterval(musicScheduler, 100);
+  }
+
   function resetGame() {
     stageIndex = 0; wavesInStage = 0;
     MAP = buildMap(stageIndex * 97 + 7);
@@ -207,6 +318,7 @@
 
   function gameOver() {
     state = 'gameover';
+    sfxGameOver();
     if (score > highScore) { highScore = score; try { localStorage.setItem('ar_highscore', String(highScore)); } catch (e) {} }
   }
 
@@ -580,6 +692,7 @@
     if (rcFireCooldown > 0) return;
     rcFireCooldown = 0.22;
     rcMuzzle = 0.1;
+    sfxTankShoot();
     let best = null, bestZ = -1;
     for (const o of rcObstacles) {
       if (!o.alive || o.type === 'rock' || o.lane !== rcTargetLane) continue;
@@ -588,7 +701,8 @@
     }
     if (best) {
       best.hp -= 1;
-      if (best.hp <= 0) { best.alive = false; best.exploding = 0.3; rcScore += best.type === 'barrel' ? 20 : 15; }
+      if (best.hp <= 0) { best.alive = false; best.exploding = 0.3; rcScore += best.type === 'barrel' ? 20 : 15; sfxEnemyDeath(); }
+      else sfxHit();
     }
   }
   function updateRacing(dt) {
@@ -623,12 +737,13 @@
         o.alive = false; o.exploding = 0.001;
         rcHp -= (o.type === 'rock' ? 24 : o.type === 'police' ? 16 : 12);
         rcDmgFlash = 0.35;
-        if (rcHp <= 0) { rcHp = 0; state = 'racinglost'; }
+        sfxCrash();
+        if (rcHp <= 0) { rcHp = 0; state = 'racinglost'; sfxGameOver(); }
       }
     }
     rcObstacles = rcObstacles.filter(o => o.z > -0.08);
 
-    if (state === 'racing' && rcDistance >= RC_TARGET_DISTANCE) state = 'racingwin';
+    if (state === 'racing' && rcDistance >= RC_TARGET_DISTANCE) { state = 'racingwin'; sfxVictory(); }
   }
   function drawTankAt(screenX, y, scale, alpha, color, dark) {
     ctx.save();
@@ -810,14 +925,15 @@
 
   const fireBtn = document.getElementById('fireBtn');
   function handleTap() {
-    if (state === 'menu') { startGame(); return; }
-    if (state === 'gameover') { startGame(); return; }
+    unlockAudio();
+    if (state === 'menu') { sfxUiBeep(); startGame(); return; }
+    if (state === 'gameover') { sfxUiBeep(); startGame(); return; }
     if (state === 'wavebreak' || state === 'stageclear') return;
-    if (state === 'paused') { state = 'playing'; return; }
+    if (state === 'paused') { sfxUiBeep(); state = 'playing'; return; }
     if (state === 'paywall') { payForFinalMission(); return; }
-    if (state === 'victory') { startRacing(); return; }
+    if (state === 'victory') { sfxUiBeep(); startRacing(); return; }
     if (state === 'racing') { shootRacing(); return; }
-    if (state === 'racingwin' || state === 'racinglost') { startGame(); return; }
+    if (state === 'racingwin' || state === 'racinglost') { sfxUiBeep(); startGame(); return; }
     if (state === 'playing') shoot();
   }
   function handleFireTap(e) {
@@ -840,6 +956,7 @@
     if (fireCooldown > 0) return;
     fireCooldown = 0.28;
     muzzleFlash = 0.12;
+    sfxShoot();
     const wallDist = castRay(player.angle).dist;
     let best = null, bestDist = Infinity;
     for (const e of enemies) {
@@ -856,8 +973,8 @@
     }
     if (best) {
       best.hp -= 1; best.hitT = 0.15;
-      if (best.hp <= 0) { best.alive = false; score += 15; kills++; }
-      else score += 3;
+      if (best.hp <= 0) { best.alive = false; score += 15; kills++; sfxEnemyDeath(); }
+      else { score += 3; sfxHit(); }
     }
   }
 
@@ -930,6 +1047,7 @@
           e.attackT = 0.9;
           player.hp -= e.kind.dmg;
           dmgFlash = 0.35;
+          sfxPlayerHurt();
           if (player.hp <= 0) { player.hp = 0; gameOver(); return; }
         }
       }
@@ -940,13 +1058,17 @@
       if (wavesInStage >= WAVES_PER_STAGE) {
         if (stageIndex >= STAGES.length - 1) {
           state = 'victory';
+          sfxVictory();
         } else if (stageIndex === STAGES.length - 2 && !finalUnlocked) {
           state = 'paywall';
+          sfxUiBeep();
         } else {
           state = 'stageclear';
+          sfxStageClear();
         }
       } else {
         state = 'wavebreak';
+        sfxWaveClear();
       }
     }
   }
