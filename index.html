@@ -147,6 +147,7 @@
   let state = 'menu'; // menu, playing, wavebreak, gameover, paused
   let player, enemies, wave, kills, score, fireCooldown, muzzleFlash, hitFlash, waveTimer, dmgFlash;
   let npcs = [];
+  let artifactCrate = null; // { x, y, opened, hitT } spawned once per stage; shooting it instantly completes the stage
   let playerWalkPhase = 0;
   let highScore = 0;
   // tank racing bonus mission
@@ -250,6 +251,7 @@
   function sfxUiBeep() { beep(700, 0.06, 'square', 0.2); }
   function sfxWaveClear() { [660, 880, 1100].forEach((f, i) => setTimeout(() => beep(f, 0.12, 'square', 0.25), i * 90)); }
   function sfxStageClear() { [523, 659, 784, 1046].forEach((f, i) => setTimeout(() => beep(f, 0.15, 'square', 0.28), i * 100)); }
+  function sfxArtifact() { [784, 988, 1245, 1568].forEach((f, i) => setTimeout(() => beep(f, 0.14, 'triangle', 0.32), i * 90)); }
   function sfxVictory() { [523, 659, 784, 1046, 1318].forEach((f, i) => setTimeout(() => beep(f, 0.2, 'triangle', 0.3), i * 130)); }
   function sfxGameOver() { [400, 340, 260, 180].forEach((f, i) => setTimeout(() => beep(f, 0.24, 'sawtooth', 0.3), i * 140)); }
 
@@ -298,6 +300,7 @@
     player = { x: MAP_W / 2 + 0.5, y: MAP_H / 2 + 0.5, angle: 0, hp: 100, maxHp: 100, speed: 3.2, turnSpeed: 1.4 };
     enemies = [];
     npcs = [];
+    artifactCrate = null;
     wave = 0; kills = 0; score = 0;
     fireCooldown = 0; muzzleFlash = 0; hitFlash = 0; dmgFlash = 0; waveTimer = 0;
     playerWalkPhase = 0;
@@ -310,6 +313,7 @@
     player.x = MAP_W / 2 + 0.5; player.y = MAP_H / 2 + 0.5; player.angle = 0;
     enemies = [];
     spawnNpcs();
+    spawnArtifactCrate();
     startWave();
   }
 
@@ -321,6 +325,12 @@
       const p = randFloorCell(3);
       npcs.push({ x: p.x, y: p.y, angle: Math.random() * Math.PI * 2, speed: 0.55 + Math.random() * 0.35, wanderT: 1 + Math.random() * 2, animT: Math.random() * 10 });
     }
+  }
+
+  function spawnArtifactCrate() {
+    artifactCrate = null;
+    const p = randFloorCell(6);
+    artifactCrate = { x: p.x, y: p.y, opened: false, hitT: 0 };
   }
 
   function randFloorCell(minDistFromPlayer) {
@@ -356,7 +366,7 @@
     state = 'playing';
   }
 
-  function startGame() { resetGame(); state = 'playing'; spawnNpcs(); startWave(); }
+  function startGame() { resetGame(); state = 'playing'; spawnNpcs(); spawnArtifactCrate(); startWave(); }
 
   function gameOver() {
     state = 'gameover';
@@ -559,14 +569,42 @@
     ctx.restore();
   }
 
+  function drawCrateSprite(screenX, topY, size, alpha) {
+    ctx.save();
+    ctx.globalAlpha = alpha;
+    const boxW = size * 0.56, boxH = size * 0.58;
+    const boxTop = topY + size * 0.42;
+    const pulse = 0.5 + 0.5 * Math.sin(performance.now() / 300);
+    ctx.fillStyle = '#8a5a2b';
+    ctx.fillRect(screenX - boxW / 2, boxTop, boxW, boxH);
+    ctx.strokeStyle = '#4a2e14'; ctx.lineWidth = Math.max(1, size * 0.02);
+    ctx.strokeRect(screenX - boxW / 2, boxTop, boxW, boxH);
+    ctx.beginPath();
+    ctx.moveTo(screenX - boxW / 2, boxTop + boxH * 0.5); ctx.lineTo(screenX + boxW / 2, boxTop + boxH * 0.5);
+    ctx.moveTo(screenX, boxTop); ctx.lineTo(screenX, boxTop + boxH);
+    ctx.stroke();
+    ctx.strokeStyle = 'rgba(255,215,90,' + (0.4 + 0.5 * pulse) + ')';
+    ctx.lineWidth = Math.max(1.5, size * 0.045);
+    ctx.strokeRect(screenX - boxW / 2 - 2, boxTop - 2, boxW + 4, boxH + 4);
+    ctx.fillStyle = 'rgba(255,240,140,' + (0.7 + 0.3 * pulse) + ')';
+    ctx.font = 'bold ' + Math.round(size * 0.34) + 'px Arial';
+    ctx.textAlign = 'center';
+    ctx.fillText('\u2605', screenX, boxTop - size * 0.08);
+    ctx.textAlign = 'left';
+    ctx.restore();
+  }
+
   function renderCharacters() {
     const items = [];
     for (const e of enemies) {
       if (!e.alive) continue;
-      items.push({ x: e.x, y: e.y, body: e.kind.color, head: e.kind.dark, radius: e.kind.radius, animT: e.animT || 0, hitT: e.hitT, hp: e.hp, maxHp: e.maxHp, alien: true });
+      items.push({ x: e.x, y: e.y, body: e.kind.color, head: e.kind.dark, radius: e.kind.radius, animT: e.animT || 0, hitT: e.hitT, hp: e.hp, maxHp: e.maxHp, alien: true, type: 'humanoid' });
     }
     for (const n of npcs) {
-      items.push({ x: n.x, y: n.y, body: NPC_KIND.color, head: NPC_KIND.dark, radius: NPC_KIND.radius, animT: n.animT || 0, hitT: 0, hp: null, maxHp: null, alien: false });
+      items.push({ x: n.x, y: n.y, body: NPC_KIND.color, head: NPC_KIND.dark, radius: NPC_KIND.radius, animT: n.animT || 0, hitT: 0, hp: null, maxHp: null, alien: false, type: 'humanoid' });
+    }
+    if (artifactCrate && !artifactCrate.opened) {
+      items.push({ x: artifactCrate.x, y: artifactCrate.y, radius: 0.3, type: 'crate' });
     }
     const sorted = items.map(o => {
       const dx = o.x - player.x, dy = o.y - player.y;
@@ -584,6 +622,10 @@
       const groundY = HALF_H + (RH / s.dist) * 0.42;
       const topY = groundY - size;
       const alpha = Math.max(0.15, Math.min(1, 1 - s.dist / MAX_DEPTH));
+      if (s.o.type === 'crate') {
+        drawCrateSprite(screenX, topY, size, alpha);
+        continue;
+      }
       drawHumanoidSprite(screenX, topY, size, s.o.body, s.o.head, s.o.animT, s.o.hitT > 0, alpha, s.o.alien);
       if (s.o.hp !== null && s.o.hp < s.o.maxHp) {
         const bw = size * 0.5;
@@ -753,6 +795,7 @@
     ctx.fillStyle = 'rgba(0,0,0,0.55)'; ctx.fillRect(0, 0, RW, RH);
     centeredText('ВОЛНА ' + (wave) + ' ЗАЧИЩЕНА', RH / 2 - 10, 24, '#4CAF50');
     centeredText('Следующая через ' + Math.ceil(2 - waveTimer), RH / 2 + 20, 14, '#ccc', 'normal');
+    centeredText('Совет: ищи артефакт в ящике — досрочная победа в миссии', RH / 2 + 46, 11, '#ffcc33', 'normal');
   }
   function drawStageClear() {
     const g = ctx.createLinearGradient(0, 0, 0, RH);
@@ -1136,7 +1179,7 @@
     for (let pi = 0; pi < pelletCount; pi++) {
       const pelletAngle = pelletCount > 1 ? player.angle + (Math.random() - 0.5) * wp.spreadRad : player.angle;
       const wallDist = castRay(pelletAngle).dist;
-      let best = null, bestDist = Infinity;
+      let best = null, bestDist = Infinity, bestIsCrate = false;
       for (const e of enemies) {
         if (!e.alive) continue;
         const dx = e.x - player.x, dy = e.y - player.y;
@@ -1146,20 +1189,53 @@
         const diff = Math.abs(normAngle(angTo - pelletAngle));
         const angularSize = Math.max(0.065, Math.atan2(e.kind.radius, dist));
         if (diff < angularSize + 0.055) {
-          if (dist < bestDist) { bestDist = dist; best = e; }
+          if (dist < bestDist) { bestDist = dist; best = e; bestIsCrate = false; }
+        }
+      }
+      if (artifactCrate && !artifactCrate.opened) {
+        const dx = artifactCrate.x - player.x, dy = artifactCrate.y - player.y;
+        const dist = Math.hypot(dx, dy);
+        if (dist <= wallDist) {
+          const angTo = Math.atan2(dy, dx);
+          const diff = Math.abs(normAngle(angTo - pelletAngle));
+          const angularSize = Math.max(0.065, Math.atan2(0.3, dist));
+          if (diff < angularSize + 0.055 && dist < bestDist) {
+            bestDist = dist; best = artifactCrate; bestIsCrate = true;
+          }
         }
       }
       if (best) {
-        best.hp -= wp.dmg; best.hitT = 0.15;
-        if (best.hp <= 0) {
-          best.alive = false;
-          score += best.kind.boss ? 220 : 15;
-          kills++;
-          sfxEnemyDeath();
+        if (bestIsCrate) {
+          artifactCrate.opened = true;
+          score += 150;
+          sfxArtifact();
+          completeStage();
         } else {
-          score += 3; sfxHit();
+          best.hp -= wp.dmg; best.hitT = 0.15;
+          if (best.hp <= 0) {
+            best.alive = false;
+            score += best.kind.boss ? 220 : 15;
+            kills++;
+            sfxEnemyDeath();
+          } else {
+            score += 3; sfxHit();
+          }
         }
       }
+    }
+  }
+
+  function completeStage() {
+    if (stageIndex >= STAGES.length - 1) {
+      state = 'victory';
+      sfxVictory();
+      recordLeaderboardEntry();
+    } else if (stageIndex === STAGES.length - 2 && !finalUnlocked) {
+      state = 'paywall';
+      sfxUiBeep();
+    } else {
+      state = 'stageclear';
+      sfxStageClear();
     }
   }
 
@@ -1241,17 +1317,7 @@
       wavesInStage++;
       waveTimer = 0;
       if (wavesInStage >= WAVES_PER_STAGE) {
-        if (stageIndex >= STAGES.length - 1) {
-          state = 'victory';
-          sfxVictory();
-          recordLeaderboardEntry();
-        } else if (stageIndex === STAGES.length - 2 && !finalUnlocked) {
-          state = 'paywall';
-          sfxUiBeep();
-        } else {
-          state = 'stageclear';
-          sfxStageClear();
-        }
+        completeStage();
       } else {
         state = 'wavebreak';
         sfxWaveClear();
