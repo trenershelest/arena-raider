@@ -229,6 +229,9 @@
   let sponsorFlashT = 0;
   const SPONSOR_FLASH_DUR = 1.8;
   let player, enemies, wave, kills, score, fireCooldown, muzzleFlash, hitFlash, waveTimer, dmgFlash;
+  let lives = 3;
+  const MAX_LIVES = 3;
+  const CRATE_HP = 5;
   let npcs = [];
   let artifactCrate = null; // { x, y, opened, hitT } spawned once per stage; shooting it instantly completes the stage
   let playerWalkPhase = 0;
@@ -387,6 +390,7 @@
     wave = 0; kills = 0; score = 0;
     fireCooldown = 0; muzzleFlash = 0; hitFlash = 0; dmgFlash = 0; waveTimer = 0;
     playerWalkPhase = 0;
+    lives = MAX_LIVES;
   }
 
   function advanceStage() {
@@ -413,7 +417,7 @@
   function spawnArtifactCrate() {
     artifactCrate = null;
     const p = randFloorCell(6);
-    artifactCrate = { x: p.x, y: p.y, opened: false, hitT: 0 };
+    artifactCrate = { x: p.x, y: p.y, opened: false, hitT: 0, hp: CRATE_HP, maxHp: CRATE_HP };
   }
 
   function randFloorCell(minDistFromPlayer) {
@@ -452,10 +456,24 @@
   function startGame() { resetGame(); state = 'playing'; spawnNpcs(); spawnArtifactCrate(); startWave(); }
 
   function gameOver() {
+    lives--;
+    if (lives > 0) {
+      state = 'lifelost';
+      waveTimer = 0;
+      sfxGameOver();
+      return;
+    }
     state = 'gameover';
     sfxGameOver();
     if (score > highScore) { highScore = score; try { localStorage.setItem('ar_highscore', String(highScore)); } catch (e) {} }
     recordLeaderboardEntry();
+  }
+  function respawnLife() {
+    player.hp = player.maxHp;
+    player.x = MAP_W / 2 + 0.5; player.y = MAP_H / 2 + 0.5; player.angle = 0;
+    enemies = [];
+    wave--; // startWave() increments wave, so step back to replay the same wave number
+    startWave();
   }
 
   function normAngle(a) { while (a > Math.PI) a -= Math.PI * 2; while (a < -Math.PI) a += Math.PI * 2; return a; }
@@ -815,7 +833,7 @@
     ctx.restore();
   }
 
-  function drawCrateSprite(screenX, topY, size, alpha) {
+  function drawCrateSprite(screenX, topY, size, alpha, hitT, hp, maxHp) {
     ctx.save();
     ctx.globalAlpha = alpha;
     const boxW = size * 0.56, boxH = size * 0.58;
@@ -850,6 +868,17 @@
     ctx.textAlign = 'center';
     ctx.fillText('\u2605', screenX, boxTop - size * 0.08);
     ctx.textAlign = 'left';
+    if (hitT > 0) {
+      ctx.globalCompositeOperation = 'source-atop';
+      ctx.fillStyle = 'rgba(255,255,255,0.5)';
+      ctx.fillRect(screenX - boxW / 2 - 3, boxTop - 3, boxW + 6, boxH + 6);
+      ctx.globalCompositeOperation = 'source-over';
+    }
+    if (typeof hp === 'number' && typeof maxHp === 'number' && hp < maxHp) {
+      const bw = size * 0.5;
+      ctx.fillStyle = 'rgba(0,0,0,0.6)'; ctx.fillRect(screenX - bw / 2, boxTop - 10, bw, 4);
+      ctx.fillStyle = '#ffb020'; ctx.fillRect(screenX - bw / 2, boxTop - 10, bw * Math.max(0, hp / maxHp), 4);
+    }
     ctx.restore();
   }
 
@@ -863,7 +892,7 @@
       items.push({ x: n.x, y: n.y, body: NPC_KIND.color, head: NPC_KIND.dark, radius: NPC_KIND.radius, animT: n.animT || 0, hitT: 0, hp: null, maxHp: null, species: null, type: 'humanoid' });
     }
     if (artifactCrate && !artifactCrate.opened) {
-      items.push({ x: artifactCrate.x, y: artifactCrate.y, radius: 0.3, type: 'crate' });
+      items.push({ x: artifactCrate.x, y: artifactCrate.y, radius: 0.3, type: 'crate', hp: artifactCrate.hp, maxHp: artifactCrate.maxHp, hitT: artifactCrate.hitT });
     }
     const sorted = items.map(o => {
       const dx = o.x - player.x, dy = o.y - player.y;
@@ -882,7 +911,7 @@
       const topY = groundY - size;
       const alpha = Math.max(0.15, Math.min(1, 1 - s.dist / MAX_DEPTH));
       if (s.o.type === 'crate') {
-        drawCrateSprite(screenX, topY, size, alpha);
+        drawCrateSprite(screenX, topY, size, alpha, s.o.hitT, s.o.hp, s.o.maxHp);
         continue;
       }
       if (s.o.species === 'dwarf' && dwarfSpriteLoaded) {
@@ -1068,6 +1097,11 @@
     ctx.fillText('HP', 14, 19);
     ctx.font = '9px Arial'; ctx.fillStyle = '#8fd6ff';
     ctx.fillText(WEAPONS[currentWeapon].name, 136, 19);
+    ctx.font = 'bold 11px Arial'; ctx.textAlign = 'left';
+    for (let li = 0; li < MAX_LIVES; li++) {
+      ctx.fillStyle = li < lives ? '#ff4455' : 'rgba(255,255,255,0.25)';
+      ctx.fillText('♥', 10 + li * 13, 27);
+    }
     ctx.textAlign = 'right'; ctx.fillStyle = '#ffcc33';
     ctx.fillText('ВОЛНА ' + wave + ' · ' + STAGES[stageIndex].name, RW - 10, 13);
     ctx.fillStyle = '#fff';
@@ -1306,6 +1340,12 @@
     buttons.restart = { x: RW / 2 - 95, y: RH * 0.72, w: 190, h: 50 };
     ctx.fillStyle = '#ff9900'; roundRect(buttons.restart.x, buttons.restart.y, buttons.restart.w, buttons.restart.h, 12); ctx.fill();
     centeredText('ЕЩЁ РАЗ', buttons.restart.y + 33, 18, '#1a1a1a');
+  }
+  function drawLifeLost() {
+    ctx.fillStyle = 'rgba(50,0,0,0.68)'; ctx.fillRect(0, 0, RW, RH);
+    centeredText('ЖИЗНЬ ПОТЕРЯНА', RH / 2 - 16, 24, '#ff5533');
+    centeredText('ОСТАЛОСЬ ЖИЗНЕЙ: ' + lives, RH / 2 + 12, 16, '#ffcc33', 'normal');
+    centeredText('Возрождение на текущей волне через ' + Math.max(0, Math.ceil(2.2 - waveTimer)), RH / 2 + 38, 11, '#ccc', 'normal');
   }
   function drawWaveBreak() {
     ctx.fillStyle = 'rgba(0,0,0,0.55)'; ctx.fillRect(0, 0, RW, RH);
@@ -1598,6 +1638,7 @@
     renderGun();
     renderPlayerLegs();
     renderHUD();
+    if (state === 'lifelost') drawLifeLost();
     if (state === 'wavebreak') drawWaveBreak();
     if (state === 'stageclear') drawStageClear();
     if (state === 'gameover') drawGameOver();
@@ -1660,7 +1701,7 @@
       sfxUiBeep(); startGame(); return;
     }
     if (state === 'gameover') { sfxUiBeep(); startGame(); return; }
-    if (state === 'wavebreak' || state === 'stageclear') return;
+    if (state === 'wavebreak' || state === 'stageclear' || state === 'lifelost') return;
     if (state === 'paused') { sfxUiBeep(); state = 'playing'; return; }
     if (state === 'paywall') { payForFinalMission(); return; }
     if (state === 'victory') { sfxUiBeep(); startRacing(); return; }
@@ -1746,11 +1787,16 @@
       }
       if (best) {
         if (bestIsCrate) {
-          artifactCrate.opened = true;
-          score += 150;
-          sfxArtifact();
-          sponsorFlashT = SPONSOR_FLASH_DUR;
-          completeStage();
+          artifactCrate.hp -= 1;
+          artifactCrate.hitT = 0.15;
+          sfxHit();
+          if (artifactCrate.hp <= 0) {
+            artifactCrate.opened = true;
+            score += 150;
+            sfxArtifact();
+            sponsorFlashT = SPONSOR_FLASH_DUR;
+            completeStage();
+          }
         } else {
           best.hp -= wp.dmg; best.hitT = 0.15;
           if (best.hp <= 0) {
@@ -1791,6 +1837,11 @@
       bootT += dt;
       stepBootStars(dt);
       if (bootT > BOOT_DURATION) state = 'menu';
+      return;
+    }
+    if (state === 'lifelost') {
+      waveTimer += dt;
+      if (waveTimer > 2.2) respawnLife();
       return;
     }
     if (state === 'wavebreak') {
