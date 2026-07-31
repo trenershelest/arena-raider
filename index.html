@@ -1678,7 +1678,25 @@
   function canvasTapXY(clientX, clientY) {
     const rect = canvas.getBoundingClientRect();
     if (!rect.width || !rect.height) return { x: -1, y: -1 };
-    return { x: (clientX - rect.left) / rect.width * RW, y: (clientY - rect.top) / rect.height * RH };
+    // canvas is scaled via CSS object-fit:contain, so its DOM box (rect) is usually
+    // larger than the actual letterboxed/pillarboxed drawing surface. Account for that
+    // offset, otherwise taps land on the wrong internal X/Y (very noticeable in landscape,
+    // where the box is pillarboxed left/right and X taps get shifted).
+    const canvasAspect = RW / RH;
+    const rectAspect = rect.width / rect.height;
+    let dispW, dispH, offX, offY;
+    if (rectAspect > canvasAspect) {
+      dispH = rect.height;
+      dispW = dispH * canvasAspect;
+      offX = (rect.width - dispW) / 2;
+      offY = 0;
+    } else {
+      dispW = rect.width;
+      dispH = dispW / canvasAspect;
+      offX = 0;
+      offY = (rect.height - dispH) / 2;
+    }
+    return { x: (clientX - rect.left - offX) / dispW * RW, y: (clientY - rect.top - offY) / dispH * RH };
   }
   canvas.addEventListener('click', (e) => { const p = canvasTapXY(e.clientX, e.clientY); handleTap(p.x, p.y); });
   canvas.addEventListener('touchstart', e => {
