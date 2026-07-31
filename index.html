@@ -12,11 +12,17 @@
   #joyZone { left:18px; bottom:18px; width:130px; height:130px; border-radius:50%; background:rgba(255,255,255,0.08); border:2px solid rgba(255,255,255,0.25); }
   #joyThumb { position:absolute; left:35px; top:35px; width:60px; height:60px; border-radius:50%; background:rgba(255,150,0,0.55); border:2px solid rgba(255,255,255,0.6); pointer-events:none; }
   #fireBtn { right:24px; bottom:30px; width:88px; height:88px; border-radius:50%; background:rgba(255,40,40,0.35); border:3px solid rgba(255,80,80,0.8); display:flex; align-items:center; justify-content:center; font:bold 15px Arial; color:#fff; text-shadow:0 0 4px #000; }
+  #introVideo { position:fixed; inset:0; width:100%; height:100%; object-fit:cover; background:#000; z-index:50; }
+  #skipIntroBtn { position:fixed; top:calc(env(safe-area-inset-top, 0px) + 16px); right:16px; z-index:60; padding:8px 16px; border-radius:20px; background:rgba(0,0,0,0.55); border:1px solid rgba(255,255,255,0.5); color:#fff; font:bold 13px Arial; -webkit-user-select:none; user-select:none; }
+  #unmuteHint { position:fixed; left:50%; bottom:calc(env(safe-area-inset-bottom, 0px) + 26px); transform:translateX(-50%); z-index:60; padding:7px 14px; border-radius:16px; background:rgba(0,0,0,0.55); border:1px solid rgba(255,255,255,0.4); color:#fff; font:bold 12px Arial; -webkit-user-select:none; user-select:none; }
 </style>
 <script src="https://telegram.org/js/telegram-web-app.js"></script>
 </head>
 <body>
 <div id="wrap"><canvas id="gameCanvas" width="480" height="300"></canvas></div>
+<video id="introVideo" src="promo.mp4" muted playsinline webkit-playsinline="true" preload="auto"></video>
+<div id="skipIntroBtn">Пропустить &#9654;</div>
+<div id="unmuteHint">&#128266; Нажми для звука</div>
 <div id="joyZone"><div id="joyThumb"></div></div>
 <div id="fireBtn">FIRE</div>
 <script>
@@ -37,6 +43,58 @@
       });
     }
   } catch (e) {}
+  // ---------- intro promo video ----------
+  (function () {
+    var iv = document.getElementById('introVideo');
+    var skipBtn = document.getElementById('skipIntroBtn');
+    var unmuteHint = document.getElementById('unmuteHint');
+    var introDone = false;
+    function endIntro() {
+      if (introDone) return;
+      introDone = true;
+      try { iv.pause(); } catch (e) {}
+      iv.style.display = 'none';
+      skipBtn.style.display = 'none';
+      unmuteHint.style.display = 'none';
+      if (typeof state !== 'undefined') { try { state = 'menu'; } catch (e) {} }
+      window.__introDone = true;
+    }
+    window.__endIntro = endIntro;
+    if (!iv) { return; }
+    iv.addEventListener('ended', endIntro);
+    iv.addEventListener('error', endIntro);
+    skipBtn.addEventListener('click', endIntro);
+    skipBtn.addEventListener('touchstart', function (e) { e.preventDefault(); endIntro(); }, { passive: false });
+    var triedUnmute = false;
+    function tryUnmute() {
+      if (triedUnmute) return;
+      triedUnmute = true;
+      try {
+        iv.muted = false;
+        var p = iv.play();
+        if (p && p.catch) { p.catch(function () { unmuteHint.style.display = 'block'; }); }
+      } catch (e) { unmuteHint.style.display = 'block'; }
+    }
+    iv.addEventListener('click', function () {
+      if (iv.muted) { iv.muted = false; unmuteHint.style.display = 'none'; }
+    });
+    unmuteHint.addEventListener('click', function () { iv.muted = false; unmuteHint.style.display = 'none'; });
+    // Attempt playback: muted first (guaranteed), then try to unmute since a user
+    // gesture (tapping Start in Telegram) usually already occurred.
+    var playPromise = iv.play();
+    if (playPromise && playPromise.then) {
+      playPromise.then(tryUnmute).catch(function () {
+        // Autoplay blocked entirely; skip straight to the menu rather than
+        // leaving the player stuck on a black screen.
+        endIntro();
+      });
+    } else {
+      tryUnmute();
+    }
+    // Safety net: never block the game for more than ~18s even if the
+    // video fails to fire 'ended' or 'error' for some reason.
+    setTimeout(endIntro, 18000);
+  })();
   // ---------- canvas / render config ----------
   const canvas = document.getElementById('gameCanvas');
   const ctx = canvas.getContext('2d');
@@ -222,7 +280,7 @@
   }
 
   // ---------- state ----------
-  let state = 'boot'; // boot, menu, playing, wavebreak, gameover, paused
+  let state = 'intro'; // intro, boot, menu, playing, wavebreak, gameover, paused
   let bootT = 0;
   const BOOT_DURATION = 4.4;
   let bootStars = null;
@@ -1623,6 +1681,7 @@
     if (sponsorFlashT > 0) drawSponsorFlash();
   }
   function drawInner() {
+    if (state === 'intro') { return; }
     if (state === 'boot') { drawBoot(); return; }
     if (state === 'menu') { drawMenu(); return; }
     if (state === 'victory') { drawVictory(); return; }
@@ -1828,6 +1887,7 @@
 
   // ---------- update ----------
   function update(dt) {
+    if (state === 'intro') { return; }
     if (fireCooldown > 0) fireCooldown -= dt;
     if (muzzleFlash > 0) muzzleFlash -= dt;
     if (dmgFlash > 0) dmgFlash -= dt;
