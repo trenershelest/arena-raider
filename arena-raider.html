@@ -131,7 +131,7 @@
 
   // ---------- stages (10 missions, distinct biome progression) ----------
   const MISSION_DEFS = [
-    { name: 'РЖАВЫЙ СЕКТОР', hue: 265, biome: 'industrial', pano: 'girders', names: ['ползун', 'летун', 'громила'], species: 'alien' },
+    { name: 'РАЗБИТЫЙ БЛОКПОСТ', hue: 265, biome: 'industrial', pano: 'checkpoint', names: ['ползун', 'летун', 'громила'], species: 'alien' },
     { name: 'КИСЛОТНЫЕ ТОПИ', hue: 95, biome: 'swamp', pano: 'blobs', names: ['жалун', 'плевун', 'тварь'], species: 'predator' },
     { name: 'КРОВАВАЯ ПУСТОШЬ', hue: 5, biome: 'volcanic', pano: 'spikes', names: ['коготь', 'жало', 'титан'], species: 'dwarf' },
     { name: 'ЛЕДЯНОЙ УЛЕЙ', hue: 205, biome: 'ice', pano: 'icepeaks', names: ['ледоход', 'морозник', 'колосс'], species: 'ghoul' },
@@ -140,7 +140,7 @@
     { name: 'НЕОНОВЫЕ РУИНЫ', hue: 320, biome: 'neon', pano: 'bars', names: ['мигун', 'фантом', 'страж'], species: 'cyborg' },
     { name: 'ГЛУБОКАЯ БЕЗДНА', hue: 250, biome: 'alienhive', pano: 'hive', names: ['гаишник', 'инспектор', 'полковник'], species: 'cop' },
     { name: 'КРИСТАЛЬНЫЙ ХРАМ', hue: 170, biome: 'crystal', pano: 'crystals', names: ['паяц', 'скоморох', 'арлекин'], species: 'clown' },
-    { name: 'ЦИТАДЕЛЬ ХОМЯКОВ', hue: 35, biome: 'orbital', pano: 'towers', names: ['хомяк', 'хомячище', 'ХОМЯЧИЩЕ-РЕКС'], species: 'hamster' }
+    { name: 'КОСМИЧЕСКИЙ КОВЧЕГ', hue: 35, biome: 'orbital', pano: 'shiphull', names: ['хомяк', 'хомячище', 'ХОМЯЧИЩЕ-РЕКС'], species: 'hamster' }
   ];
   function speciesPalette(species) {
     switch (species) {
@@ -170,9 +170,9 @@
       },
       panoColor: hslToHex(h, 50, 15), panoStyle: def.pano,
       enemyKinds: [
-        { name: def.names[0], species: def.species, color: pal ? pal.color : hslToHex((h + 90) % 360, 65, 52), dark: pal ? pal.dark : hslToHex((h + 90) % 360, 65, 26), hp: (2 + Math.floor(idx / 3)) * 6, speed: 1.4 + idx * 0.03, radius: 0.28, dmg: 4 + Math.floor(idx / 2) },
-        { name: def.names[1], species: def.species, color: pal ? pal.color : hslToHex((h + 180) % 360, 65, 55), dark: pal ? pal.dark : hslToHex((h + 180) % 360, 65, 28), hp: (1 + Math.floor(idx / 5)) * 6, speed: 2.3 + idx * 0.04, radius: 0.22, dmg: 3 + Math.floor(idx / 2) },
-        { name: def.names[2], species: def.species, color: pal ? pal.color : hslToHex(h, 60, 48), dark: pal ? pal.dark : hslToHex(h, 60, 22), hp: (5 + idx) * 6, speed: 0.9 + idx * 0.025, radius: 0.38 + Math.min(0.08, idx * 0.008), dmg: 7 + idx }
+        { name: def.names[0], species: def.species, color: pal ? pal.color : hslToHex((h + 90) % 360, 65, 52), dark: pal ? pal.dark : hslToHex((h + 90) % 360, 65, 26), hp: (2 + Math.floor(idx / 3)) * 6, speed: 1.68 + idx * 0.036, radius: 0.28, dmg: Math.round((4 + Math.floor(idx / 2)) * 1.2) },
+        { name: def.names[1], species: def.species, color: pal ? pal.color : hslToHex((h + 180) % 360, 65, 55), dark: pal ? pal.dark : hslToHex((h + 180) % 360, 65, 28), hp: (1 + Math.floor(idx / 5)) * 6, speed: 2.76 + idx * 0.048, radius: 0.22, dmg: Math.round((3 + Math.floor(idx / 2)) * 1.2) },
+        { name: def.names[2], species: def.species, color: pal ? pal.color : hslToHex(h, 60, 48), dark: pal ? pal.dark : hslToHex(h, 60, 22), hp: (5 + idx) * 6, speed: 1.08 + idx * 0.03, radius: 0.38 + Math.min(0.08, idx * 0.008), dmg: Math.round((7 + idx) * 1.2) }
       ]
     };
   }
@@ -187,10 +187,10 @@
       name: 'БОСС: ' + def.names[2].toUpperCase(),
       species: def.species,
       color: '#ff2222', dark: '#7a0000',
-      hp: weak.hp * 12,
-      speed: Math.max(0.5, tough.speed * 0.45),
+      hp: weak.hp * 14,
+      speed: Math.max(0.5, tough.speed * 0.54),
       radius: 0.62,
-      dmg: Math.round(tough.dmg * 1.3),
+      dmg: Math.round(tough.dmg * 1.56),
       boss: true
     };
   }
@@ -414,7 +414,7 @@
       const boss = makeBossKind(stageIndex);
       enemies.push({ x: p.x, y: p.y, hp: boss.hp, maxHp: boss.hp, kind: boss, alive: true, hitT: 0, attackT: 0, animT: Math.random() * 10 });
     } else {
-      const count = Math.min(3 + wave, 12);
+      const count = Math.min(3 + wave, 14);
       for (let i = 0; i < count; i++) {
         const p = randFloorCell(5);
         let kindPool = [0];
@@ -521,6 +521,20 @@
         ctx.arc(bx + tileW * 0.35, horizonY - hgt * 0.4, r2, 0, Math.PI * 2);
         ctx.moveTo(bx + tileW * 0.65 + r2 * 0.8, horizonY - hgt * 0.7);
         ctx.arc(bx + tileW * 0.65, horizonY - hgt * 0.7, r2 * 0.8, 0, Math.PI * 2);
+      } else if (stage.panoStyle === 'checkpoint') {
+        if (i % 3 === 0) {
+          const w2 = tileW * 0.3;
+          ctx.rect(bx + (tileW - w2) / 2, horizonY - hgt * 1.5, w2, hgt * 1.5);
+        } else {
+          ctx.rect(bx, horizonY - hgt * 0.32, tileW * 0.92, hgt * 0.32);
+        }
+      } else if (stage.panoStyle === 'shiphull') {
+        const w2 = tileW * 0.72;
+        const hx2 = bx + (tileW - w2) / 2;
+        ctx.moveTo(hx2, horizonY);
+        ctx.lineTo(hx2, horizonY - hgt * 0.55);
+        ctx.quadraticCurveTo(hx2 + w2 / 2, horizonY - hgt * 1.25, hx2 + w2, horizonY - hgt * 0.55);
+        ctx.lineTo(hx2 + w2, horizonY);
       } else {
         ctx.moveTo(bx, horizonY);
         ctx.lineTo(bx + tileW * 0.5, horizonY - hgt);
@@ -1642,7 +1656,7 @@
       } else {
         e.attackT = (e.attackT || 0) - dt;
         if (e.attackT <= 0) {
-          e.attackT = 1.3;
+          e.attackT = 1.05;
           player.hp -= e.kind.dmg;
           dmgFlash = 0.35;
           sfxPlayerHurt();
