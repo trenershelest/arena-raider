@@ -262,7 +262,7 @@
       localStorage.setItem(LEADERBOARD_KEY, JSON.stringify(board.slice(0, 5)));
     } catch (e) {}
   }
-  // Paste an invoice link generated via your bot's Bot API createInvoiceLink (currency 'XTR', amount 1) to enable real Telegram Stars payment.
+  // Paste an invoice link generated via your bot's Bot API createInvoiceLink (currency 'XTR', amount 10) to enable real Telegram Stars payment.
   const STAR_INVOICE_LINK = 'https://t.me/$xxgy4OdMWEuqFAAAE9p--g7fLWk';
 
   // ---------- audio (procedural, no external files) ----------
@@ -1354,7 +1354,7 @@
     ctx.textAlign = 'left';
     buttons.start = { x: RW / 2 - 110, y: RH * 0.6, w: 220, h: 54 };
     ctx.fillStyle = '#ffcc33'; roundRect(buttons.start.x, buttons.start.y, buttons.start.w, buttons.start.h, 12); ctx.fill();
-    centeredText('ОПЛАТИТЬ 1 ⭐', buttons.start.y + 35, 18, '#1a1a1a');
+    centeredText('ОПЛАТИТЬ 10 ⭐', buttons.start.y + 35, 18, '#1a1a1a');
     const inTelegram = !!(window.Telegram && window.Telegram.WebApp);
     if (!inTelegram) {
       ctx.font = '11px Arial'; ctx.fillStyle = '#999'; ctx.textAlign = 'center';
