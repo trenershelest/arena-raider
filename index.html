@@ -21,6 +21,22 @@
 <div id="fireBtn">FIRE</div>
 <script>
 (function () {
+  // ---------- Telegram fullscreen bootstrap ----------
+  try {
+    var tgBoot = window.Telegram && window.Telegram.WebApp;
+    if (tgBoot) {
+      tgBoot.ready();
+      tgBoot.expand();
+      if (typeof tgBoot.requestFullscreen === 'function') { try { tgBoot.requestFullscreen(); } catch (e) {} }
+      if (typeof tgBoot.disableVerticalSwipes === 'function') { try { tgBoot.disableVerticalSwipes(); } catch (e) {} }
+      if (typeof tgBoot.setHeaderColor === 'function') { try { tgBoot.setHeaderColor('#000000'); } catch (e) {} }
+      if (typeof tgBoot.setBackgroundColor === 'function') { try { tgBoot.setBackgroundColor('#000000'); } catch (e) {} }
+      if (typeof tgBoot.lockOrientation === 'function') { try { tgBoot.lockOrientation(); } catch (e) {} }
+      window.addEventListener('load', function () {
+        try { tgBoot.expand(); if (typeof tgBoot.requestFullscreen === 'function') tgBoot.requestFullscreen(); } catch (e) {}
+      });
+    }
+  } catch (e) {}
   // ---------- canvas / render config ----------
   const canvas = document.getElementById('gameCanvas');
   const ctx = canvas.getContext('2d');
@@ -206,7 +222,12 @@
   }
 
   // ---------- state ----------
-  let state = 'menu'; // menu, playing, wavebreak, gameover, paused
+  let state = 'boot'; // boot, menu, playing, wavebreak, gameover, paused
+  let bootT = 0;
+  const BOOT_DURATION = 4.4;
+  let bootStars = null;
+  let sponsorFlashT = 0;
+  const SPONSOR_FLASH_DUR = 1.8;
   let player, enemies, wave, kills, score, fireCooldown, muzzleFlash, hitFlash, waveTimer, dmgFlash;
   let npcs = [];
   let artifactCrate = null; // { x, y, opened, hitT } spawned once per stage; shooting it instantly completes the stage
@@ -808,6 +829,19 @@
     ctx.moveTo(screenX - boxW / 2, boxTop + boxH * 0.5); ctx.lineTo(screenX + boxW / 2, boxTop + boxH * 0.5);
     ctx.moveTo(screenX, boxTop); ctx.lineTo(screenX, boxTop + boxH);
     ctx.stroke();
+    // sponsor banner sticker across the front of the crate
+    const bannerH = boxH * 0.24;
+    const bannerY = boxTop + boxH * 0.5 - bannerH / 2;
+    ctx.fillStyle = 'rgba(15,15,25,0.92)';
+    ctx.fillRect(screenX - boxW / 2 - 2, bannerY, boxW + 4, bannerH);
+    ctx.strokeStyle = 'rgba(255,190,70,' + (0.55 + 0.35 * pulse) + ')';
+    ctx.lineWidth = Math.max(1, size * 0.015);
+    ctx.strokeRect(screenX - boxW / 2 - 2, bannerY, boxW + 4, bannerH);
+    ctx.fillStyle = '#ffd166';
+    ctx.font = 'bold ' + Math.max(4, Math.round(size * 0.105)) + 'px Arial';
+    ctx.textAlign = 'center';
+    ctx.fillText('QORUM MEDIA', screenX, bannerY + bannerH * 0.72);
+    ctx.textAlign = 'left';
     ctx.strokeStyle = 'rgba(255,215,90,' + (0.4 + 0.5 * pulse) + ')';
     ctx.lineWidth = Math.max(1.5, size * 0.045);
     ctx.strokeRect(screenX - boxW / 2 - 2, boxTop - 2, boxW + 4, boxH + 4);
@@ -1066,6 +1100,137 @@
   }
   const buttons = {};
   const WEAPON_ORDER = ['pistol', 'rifle', 'shotgun'];
+
+  // ---------- boot / sponsor splash (pseudo-3D intro) ----------
+  function initBootStars() {
+    bootStars = [];
+    for (let i = 0; i < 90; i++) {
+      bootStars.push({ x: (Math.random() - 0.5) * 2, y: (Math.random() - 0.5) * 2, z: Math.random() * 1 + 0.05 });
+    }
+  }
+  function stepBootStars(dt) {
+    if (!bootStars) initBootStars();
+    for (const s of bootStars) {
+      s.z -= dt * 0.5;
+      if (s.z <= 0.02) { s.x = (Math.random() - 0.5) * 2; s.y = (Math.random() - 0.5) * 2; s.z = 1; }
+    }
+  }
+  function drawBootStars(alpha) {
+    if (!bootStars) return;
+    ctx.save();
+    for (const s of bootStars) {
+      const px = RW / 2 + (s.x / s.z) * RW * 0.42;
+      const py = RH / 2 + (s.y / s.z) * RH * 0.42;
+      if (px < 0 || px > RW || py < 0 || py > RH) continue;
+      const r = Math.max(0.4, (1 - s.z) * 2.6);
+      ctx.globalAlpha = alpha * Math.max(0.15, 1 - s.z);
+      ctx.fillStyle = '#ffffff';
+      ctx.beginPath(); ctx.arc(px, py, r, 0, Math.PI * 2); ctx.fill();
+    }
+    ctx.restore();
+  }
+  function drawPerspectiveGrid(horizonY, hue) {
+    ctx.save();
+    ctx.strokeStyle = 'hsla(' + hue + ',90%,60%,0.32)';
+    ctx.lineWidth = 1;
+    const vpX = RW / 2;
+    for (let i = -10; i <= 10; i++) {
+      const x0 = vpX + i * 26;
+      ctx.beginPath(); ctx.moveTo(vpX, horizonY); ctx.lineTo(x0, RH); ctx.stroke();
+    }
+    for (let j = 1; j <= 9; j++) {
+      const yy = horizonY + (RH - horizonY) * (j * j) / 81;
+      ctx.beginPath(); ctx.moveTo(0, yy); ctx.lineTo(RW, yy); ctx.stroke();
+    }
+    ctx.restore();
+  }
+  function draw3DText(text, cx, cy, size, colorTop, colorSide, depth) {
+    ctx.save();
+    ctx.font = 'bold ' + size + 'px Arial';
+    ctx.textAlign = 'center';
+    for (let i = depth; i >= 1; i--) {
+      ctx.fillStyle = colorSide;
+      ctx.fillText(text, cx + i * 0.7, cy + i * 0.7);
+    }
+    ctx.shadowColor = colorTop; ctx.shadowBlur = 14;
+    ctx.fillStyle = colorTop;
+    ctx.fillText(text, cx, cy);
+    ctx.textAlign = 'left';
+    ctx.restore();
+  }
+  function drawBoot() {
+    ctx.fillStyle = '#04030a'; ctx.fillRect(0, 0, RW, RH);
+    const horizonY = RH * 0.62;
+    const phase1End = 2.0, transEnd = 2.35;
+    const hue = bootT < phase1End ? 280 : 32;
+    drawPerspectiveGrid(horizonY, hue);
+    drawBootStars(0.9);
+    const vg = ctx.createRadialGradient(RW / 2, RH * 0.42, RH * 0.15, RW / 2, RH * 0.42, RH * 0.85);
+    vg.addColorStop(0, 'rgba(0,0,0,0)'); vg.addColorStop(1, 'rgba(0,0,0,0.78)');
+    ctx.fillStyle = vg; ctx.fillRect(0, 0, RW, RH);
+
+    if (bootT < transEnd) {
+      const tIn = Math.min(1, bootT / 0.5);
+      const easeOut = 1 - Math.pow(1 - tIn, 3);
+      const scale = 0.7 + 0.3 * easeOut;
+      const fadeOut = bootT > phase1End ? Math.max(0, 1 - (bootT - phase1End) / (transEnd - phase1End)) : 1;
+      ctx.save();
+      ctx.globalAlpha = fadeOut;
+      ctx.translate(RW / 2, RH * 0.42);
+      ctx.scale(scale, scale);
+      draw3DText('ALEX WARRIOR', 0, 0, 30, '#ffaa22', '#5a3a08', 6);
+      ctx.restore();
+      ctx.globalAlpha = fadeOut;
+      centeredText('TELEGRAM MINI APP', RH * 0.42 + 34, 10, '#cbb', 'normal');
+      ctx.globalAlpha = 1;
+    } else {
+      const t2 = bootT - transEnd;
+      const fadeIn = Math.min(1, t2 / 0.35);
+      const nearEnd = BOOT_DURATION - bootT;
+      const fadeOutEnd = nearEnd < 0.4 ? Math.max(0, nearEnd / 0.4) : 1;
+      const a = Math.min(fadeIn, fadeOutEnd);
+      ctx.save();
+      ctx.globalAlpha = a;
+      centeredText('ГЕНЕРАЛЬНЫЙ СПОНСОР ПРОЕКТА', RH * 0.32, 11, '#ffcc66', 'normal');
+      const rot = t2 * 2.2;
+      const rx = Math.abs(Math.cos(rot)) * 92 + 8;
+      ctx.save();
+      ctx.translate(RW / 2, RH * 0.46);
+      ctx.strokeStyle = 'rgba(255,170,50,0.85)';
+      ctx.lineWidth = 3;
+      ctx.beginPath(); ctx.ellipse(0, 0, rx, 34, 0, 0, Math.PI * 2); ctx.stroke();
+      ctx.strokeStyle = 'rgba(255,120,50,0.4)';
+      ctx.lineWidth = 1.5;
+      ctx.beginPath(); ctx.ellipse(0, 0, rx * 0.8, 24, 0, 0, Math.PI * 2); ctx.stroke();
+      ctx.restore();
+      draw3DText('QORUM', RW / 2, RH * 0.46 - 4, 30, '#ffe066', '#7a4a00', 5);
+      draw3DText('MEDIA', RW / 2, RH * 0.46 + 30, 26, '#ffffff', '#555555', 4);
+      centeredText('MEDIA HOLDING', RH * 0.46 + 58, 11, '#ffaa55', 'normal');
+      ctx.restore();
+    }
+    ctx.globalAlpha = 1;
+    centeredText('нажми, чтобы пропустить', RH - 14, 10, 'rgba(255,255,255,0.45)', 'normal');
+  }
+  function drawSponsorFlash() {
+    const elapsed = SPONSOR_FLASH_DUR - sponsorFlashT;
+    let a;
+    if (elapsed < 0.3) a = elapsed / 0.3;
+    else if (sponsorFlashT < 0.5) a = Math.max(0, sponsorFlashT / 0.5);
+    else a = 1;
+    ctx.save();
+    ctx.globalAlpha = a;
+    ctx.fillStyle = 'rgba(5,5,12,0.6)';
+    ctx.fillRect(0, 0, RW, RH);
+    ctx.fillStyle = 'rgba(15,15,25,0.92)';
+    const bw = 220, bh = 62, bx = RW / 2 - bw / 2, by = RH / 2 - bh / 2;
+    roundRect(bx, by, bw, bh, 10); ctx.fill();
+    ctx.strokeStyle = 'rgba(255,190,70,0.9)'; ctx.lineWidth = 2;
+    roundRect(bx, by, bw, bh, 10); ctx.stroke();
+    draw3DText('QORUM MEDIA', RW / 2, RH / 2 + 6, 20, '#ffd166', '#7a4a00', 3);
+    centeredText('НАЙДЕН СПОНСОРСКИЙ АРТЕФАКТ', RH / 2 + 26, 9, '#ffcc88', 'normal');
+    ctx.restore();
+    ctx.globalAlpha = 1;
+  }
   function drawMenu() {
     if (menuBgLoaded) {
       ctx.drawImage(menuBgImg, 0, 0, RW, RH);
@@ -1414,6 +1579,11 @@
   }
 
   function draw() {
+    drawInner();
+    if (sponsorFlashT > 0) drawSponsorFlash();
+  }
+  function drawInner() {
+    if (state === 'boot') { drawBoot(); return; }
     if (state === 'menu') { drawMenu(); return; }
     if (state === 'victory') { drawVictory(); return; }
     if (state === 'paywall') { drawPaywall(); return; }
@@ -1473,6 +1643,7 @@
   const fireBtn = document.getElementById('fireBtn');
   function handleTap(tx, ty) {
     unlockAudio();
+    if (state === 'boot') { state = 'menu'; return; }
     if (state === 'menu') {
       if (typeof tx === 'number' && typeof ty === 'number') {
         for (let wi = 0; wi < WEAPON_ORDER.length; wi++) {
@@ -1560,6 +1731,7 @@
           artifactCrate.opened = true;
           score += 150;
           sfxArtifact();
+          sponsorFlashT = SPONSOR_FLASH_DUR;
           completeStage();
         } else {
           best.hp -= wp.dmg; best.hitT = 0.15;
@@ -1595,7 +1767,14 @@
     if (fireCooldown > 0) fireCooldown -= dt;
     if (muzzleFlash > 0) muzzleFlash -= dt;
     if (dmgFlash > 0) dmgFlash -= dt;
+    if (sponsorFlashT > 0) sponsorFlashT -= dt;
 
+    if (state === 'boot') {
+      bootT += dt;
+      stepBootStars(dt);
+      if (bootT > BOOT_DURATION) state = 'menu';
+      return;
+    }
     if (state === 'wavebreak') {
       waveTimer += dt;
       if (waveTimer > 2) startWave();
