@@ -62,7 +62,16 @@
       skipBtn.style.display = 'none';
       unmuteHint.style.display = 'none';
       playHint.style.display = 'none';
-      if (typeof state !== 'undefined') { try { state = 'menu'; } catch (e) {} }
+      // Hand off to the existing "ALEX WARRIOR / QUORUM MEDIA" canvas boot
+      // splash instead of jumping straight to the menu, so both intros play
+      // in sequence: AI promo video -> boot/sponsor splash -> menu.
+      if (typeof state !== 'undefined') {
+        try {
+          state = 'boot';
+          if (typeof bootT !== 'undefined') { bootT = 0; }
+          if (typeof bootStars !== 'undefined') { bootStars = null; }
+        } catch (e) {}
+      }
       window.__introDone = true;
     }
     window.__endIntro = endIntro;
